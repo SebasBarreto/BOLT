@@ -1,29 +1,110 @@
-# Docker
-# Build a Docker image
-# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+# Pipeline de CI/CD para mi aplicación en Python en Windows
 
 trigger:
-- master
+- master  # Paso 1: rama que desees que active el pipeline
 
-resources:
-- repo: self
+pr:
+- '*'  # Paso 2: Configuración de PR (pull request)
 
-variables:
-  tag: '$(Build.BuildId)'
+pool:
+  vmImage: 'windows-latest' 
 
 stages:
-- stage: Build
-  displayName: Build image
+- stage: BuildAndTest  # Paso 3: Construcción y pruebas de la aplicación
   jobs:
-  - job: Build
-    displayName: Build
-    pool:
-      vmImage: ubuntu-latest
+  - job: BuildJob
     steps:
-    - task: Docker@2
-      displayName: Build an image
-      inputs:
-        command: build
-        dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
-        tags: |
-          $(tag)
+    - powershell: |
+        pip install -r requirements.txt
+        python setup.py build
+      displayName: 'Build'
+
+  - job: UnitTestJob
+    steps:
+    - powershell: |
+        python -m unittest discover tests
+      displayName: 'Run Unit Tests'
+
+  - job: IntegrationTestJob
+    steps:
+    - powershell: |
+        python -m unittest discover integration_tests/
+      displayName: 'Run Integration Tests'
+
+- stage: AnalyzeAndDockerize  # Paso 4: Análisis estático, cobertura de código y Dockerización
+  jobs:
+  - job: StaticCodeAnalysisJob
+    steps:
+    - powershell: |
+        pip install pylint
+        pylint my_module.py
+      displayName: 'Static Code Analysis'
+
+  - job: CodeCoverageJob
+    steps:
+    - powershell: |
+        pip install coverage
+        coverage run -m unittest discover tests/
+        coverage xml -o coverage.xml
+      displayName: 'Code Coverage'
+    publish: 
+      - codeCoverageJob
+      - coverage.xml
+
+  - job: DockerizeJob
+    steps:
+    - powershell: |
+        docker build -t devops-docker:1.0 .
+        docker tag devops-docker:1.0 $(DOCKER_REGISTRY)/devops-docker:1.0
+        docker push $(DOCKER_REGISTRY)/devops-docker:1.0
+      displayName: 'Dockerize'
+
+- stage: SecurityScanAndDeploy  # Paso 5: Análisis de seguridad de la imagen Docker y despliegue
+  jobs:
+  - job: SecurityScanJob
+    steps:
+    - powershell: |
+        # Ejecutar el análisis de seguridad con Trivy en la imagen Docker
+        trivy image -f json devops-docker:1.0
+      displayName: 'Security Scan'
+
+  - job: DeployDevJob
+    steps:
+    - script:
+        - kubectl apply -f deployment-dev.yaml
+        - kubectl apply -f service-dev.yaml
+        - kubectl apply -f configmaps-dev.yaml
+        - kubectl apply -f secrets-dev.yaml
+        - kubectl apply -f ingress-dev.yaml
+      displayName: 'Deploy to Development'
+
+  - job: DeployProdJob
+    steps:
+    - script:
+        - kubectl apply -f deployment-prod.yaml
+        - kubectl apply -f service-prod.yaml
+        - kubectl apply -f configmaps-prod.yaml
+        - kubectl apply -f secrets-prod.yaml
+        - kubectl apply -f ingress-prod.yaml
+      displayName: 'Deploy to Production'
+
+- stage: AdditionalSteps  # Paso 6: Otras etapas (pruebas de rendimiento, monitoreo, pruebas de aceptación, notificación)
+  jobs:
+  - job: PerformanceTestJob
+    steps:
+    - script:
+        # Agrega tus pruebas de rendimiento aquí
+        # Ejemplo: locust -f locustfile.py --headless --users 100 --spawn-rate 10
+      displayName: 'Performance Test'
+
+  - job: AcceptanceTestJob
+    steps:
+    - script:
+        # Agrega tus pruebas de aceptación automatizadas aquí
+      displayName: 'Automated Acceptance Tests'
+
+  - job: NotifyJob
+    steps:
+    - script: |
+        curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"Pipeline de CI/CD para mi-app en la rama $(Build.SourceBranch): $(Build.PipelineWebUrl)\"}" $(SLACK_WEBHOOK)
+      displayName: 'Notify'
