@@ -69,7 +69,7 @@ stages:
 
   - job: DeployDevJob
     steps:
-    - script:
+    - script: |
         - kubectl apply -f deployment-dev.yaml
         - kubectl apply -f service-dev.yaml
         - kubectl apply -f configmaps-dev.yaml
@@ -79,13 +79,14 @@ stages:
 
   - job: DeployProdJob
     steps:
-    - script:
+    - script: |
         - kubectl apply -f deployment-prod.yaml
         - kubectl apply -f service-prod.yaml
         - kubectl apply -f configmaps-prod.yaml
         - kubectl apply -f secrets-prod.yaml
         - kubectl apply -f ingress-prod.yaml
       displayName: 'Deploy to Production'
+
 
 
 - stage: AdditionalSteps  # Paso 6: Otras etapas (pruebas de rendimiento, monitoreo, pruebas de aceptación, notificación)
