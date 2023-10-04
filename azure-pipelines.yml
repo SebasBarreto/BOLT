@@ -1,4 +1,6 @@
 # Pipeline de CI/CD para mi aplicación en Python en Windows
+# Este pipeline realiza la construcción, pruebas, análisis estático,
+# Dockerización, análisis de seguridad, despliegue en Kubernetes y más.
 
 trigger:
 - master  # Paso 1: rama que desees que active el pipeline
@@ -47,9 +49,6 @@ stages:
         coverage run -m unittest discover tests/
         coverage xml -o coverage.xml
       displayName: 'Code Coverage'
-    publish: 
-      - codeCoverageJob
-      - coverage.xml
 
   - job: DockerizeJob
     steps:
